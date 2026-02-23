@@ -12,6 +12,9 @@ import chromadb
 print("--- RAG Logic Module Loaded Successfully ---")
 
 persist_directory = 'db_storage'
+upload_directory = 'uploads'
+
+os.makedirs(upload_directory, exist_ok=True)
 
 # ---------------------------------------------------------
 # RESTART CLEANUP LOGIC: Clear old vectors and files on boot
@@ -47,6 +50,10 @@ vectorstore = get_vectorstore()
 qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=vectorstore.as_retriever())
 
 def ingest_file(file_path):
+    filename = os.path.basename(file_path) 
+    target_path = os.path.join(upload_directory, filename) 
+    shutil.copy(file_path, target_path)
+    
     if file_path.endswith('.pdf'):
         loader = PyPDFLoader(file_path)
     else:
