@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuChat AI - Workspace</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .chat-window {
+            height: calc(100vh - 180px);
+        }
+
+        #drop-zone.dragover {
+            background-color: rgba(79, 70, 229, 0.1);
+            border: 2px dashed #4f46e5;
+        }
+
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body class="bg-[#f8f9ff] h-screen flex overflow-hidden">
+
+    <aside class="w-80 bg-white border-r border-indigo-50 flex flex-col shadow-xl z-20">
+        <div class="p-6 border-b border-indigo-50 flex items-center gap-3">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg">
+                <i class="fa-solid fa-shapes text-sm"></i>
+            </div>
+            <span class="font-bold text-xl tracking-tight">Docu<span class="text-indigo-600">Chat</span></span>
+        </div>
+
+        <div class="p-4 flex-1 overflow-y-auto">
+            <h3 class="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Select Context</h3>
+            <select id="fileSelector"
+                class="w-full bg-indigo-50 border-none rounded-xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 mb-6 cursor-pointer">
+                <option value="">All Documents</option>
+            </select>
+
+            <h3 class="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Your Library</h3>
+            <div id="fileList" class="space-y-2">
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-indigo-50">
+            <a href="{% url 'home' %}"
+                class="flex items-center justify-center gap-2 w-full p-3 text-sm font-semibold text-gray-500 hover:bg-indigo-50 rounded-xl transition">
+                <i class="fa-solid fa-house"></i> Exit to Home
+            </a>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative">
+        <div id="drop-zone"
+            class="absolute inset-0 z-10 pointer-events-none transition-all flex items-center justify-center">
+            <div id="drop-text"
+                class="bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-2xl opacity-0 scale-95 transition-all font-bold">
+                <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Release to Analyze
+            </div>
+        </div>
+
+        <header
+            class="h-20 bg-white/80 backdrop-blur-md border-b border-indigo-50 flex items-center justify-between px-10">
+            <div class="flex items-center gap-3">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-300"></div>
+                <span id="status-text" class="text-sm font-medium text-gray-500">No Document Active</span>
+            </div>
+        </header>
+
+        <div id="chat-window" class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 chat-window">
+            <div id="messages" class="max-w-4xl mx-auto">
+                <div class="flex items-start gap-5 mb-8">
+                    <div
+                        class="w-10 h-10 rounded-2xl bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white shadow-lg">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div
+                        class="bg-white border border-indigo-50 p-5 rounded-3xl shadow-sm text-gray-700 leading-relaxed">
+                        Welcome to your workspace. You can **Drag & Drop** files anywhere or click the **+** button
+                        below to upload.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="p-6 bg-transparent">
+            <div class="max-w-4xl mx-auto relative group">
+                <div
+                    class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-3xl blur opacity-20 group-focus-within:opacity-40 transition">
+                </div>
+
+                <div class="relative bg-white border border-indigo-100 rounded-2xl shadow-xl flex items-end p-2 gap-2">
+
+                    <input type="file" id="hiddenFileInput" class="hidden" accept=".pdf,.docx"
+                        onchange="handleFileSelect(event)">
+
+                    <button onclick="document.getElementById('hiddenFileInput').click()"
+                        class="mb-1 p-3 text-indigo-500 hover:bg-indigo-50 rounded-xl transition flex-shrink-0"
+                        title="Upload Document">
+                        <i class="fa-solid fa-plus text-xl"></i>
+                    </button>
+
+                    <textarea id="userInput" rows="1" placeholder="Ask a question about your files..."
+                        class="flex-1 bg-transparent border-none p-3 outline-none resize-none max-h-40 font-medium leading-relaxed"
+                        oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+
+                    <button onclick="handleSend()"
+                        class="m-1 p-4 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 flex-shrink-0">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+
+                <div class="flex justify-between px-4 mt-2">
+                    <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Local Engine v1.0</span>
+                    <span class="text-[10px] text-gray-400 font-medium italic">Shift + Enter for new line • Enter to
+                        send</span>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        const dropZone = document.body;
+        const dropText = document.getElementById('drop-text');
+        const userInput = document.getElementById('userInput');
+        const messagesDiv = document.getElementById('messages');
+        const chatWindow = document.getElementById('chat-window');
+
+        // Load Library on startup
+        window.onload = loadFiles;
+
+        // --- Keyboard Controls ---
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+            }
+        });
+
+        // --- Drag & Drop Logic ---
+        ['dragenter', 'dragover'].forEach(n => {
+            window.addEventListener(n, (e) => {
+                e.preventDefault();
+                document.getElementById('drop-zone').classList.add('dragover');
+                dropText.style.opacity = '1';
+                dropText.style.transform = 'scale(1)';
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(n => {
+            window.addEventListener(n, (e) => {
+                e.preventDefault();
+                document.getElementById('drop-zone').classList.remove('dragover');
+                dropText.style.opacity = '0';
+                dropText.style.transform = 'scale(0.95)';
+            });
+        });
+
+        window.addEventListener('drop', (e) => {
+            const file = e.dataTransfer.files[0];
+            if (file) uploadFile(file);
+        });
+
+        // --- File Uploading ---
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                uploadFile(file);
+                event.target.value = ''; // Reset input
+            }
+        }
+
+        async function uploadFile(file) {
+            const systemMsg = appendMessage('system', `Processing "${file.name}"... Please wait.`);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/upload/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    systemMsg.innerText = `✓ "${file.name}" processed and added to library.`;
+                    loadFiles();
+                    document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-green-500";
+                    document.getElementById('status-text').innerText = "Document Library Updated";
+                }
+            } catch (err) {
+                systemMsg.innerText = "Upload failed. Please check server connection.";
+            }
+        }
+
+        // --- Library Management ---
+        async function loadFiles() {
+            const res = await fetch('/api/files/');
+            const data = await res.json();
+            const list = document.getElementById('fileList');
+            const select = document.getElementById('fileSelector');
+
+            list.innerHTML = '';
+            select.innerHTML = '<option value="">All Documents</option>';
+
+            data.files.forEach(f => {
+                select.innerHTML += `<option value="${f}">${f}</option>`;
+                list.innerHTML += `
+                    <div class="flex justify-between items-center p-3 bg-indigo-50/50 rounded-xl group transition hover:bg-indigo-50">
+                        <span class="text-xs font-semibold text-gray-600 truncate w-48">
+                            <i class="fa-solid fa-file-pdf mr-2 text-indigo-400"></i>${f}
+                        </span>
+                        <button onclick="deleteFile('${f}')" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>`;
+            });
+        }
+
+        async function deleteFile(name) {
+            if (!confirm(`Remove ${name} from memory?`)) return;
+            await fetch(`/api/delete/?filename=${name}`);
+            loadFiles();
+        }
+
+        // --- Chat Interaction ---
+        async function handleSend() {
+            const text = userInput.value.trim();
+            const fileFilter = document.getElementById('fileSelector').value;
+            if (!text) return;
+
+            // Clear Input
+            userInput.value = '';
+            userInput.style.height = 'auto';
+
+            appendMessage('user', text);
+            const aiMsg = appendMessage('ai', 'Generating response...');
+
+            try {
+                const res = await fetch(`/ask/?question=${encodeURIComponent(text)}&file=${fileFilter}`);
+                const data = await res.json();
+                aiMsg.innerText = data.answer;
+            } catch (err) {
+                aiMsg.innerText = "Error: AI engine is offline.";
+            }
+        }
+
+        function appendMessage(role, text) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex items-start gap-5 mb-8 ${role === 'user' ? 'flex-row-reverse' : ''}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = `w-10 h-10 rounded-2xl flex-shrink-0 flex items-center justify-center text-white shadow-lg ${role === 'user' ? 'bg-indigo-600' : 'bg-gray-800'}`;
+            avatar.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : (role === 'system' ? '<i class="fa-solid fa-gear"></i>' : '<i class="fa-solid fa-robot"></i>');
+
+            const msg = document.createElement('div');
+            msg.className = `p-5 rounded-3xl shadow-sm border max-w-2xl ${role === 'user' ? 'bg-indigo-600 text-white border-indigo-500 rounded-tr-none' : 'bg-white border-indigo-50 text-gray-700 rounded-tl-none'}`;
+            if (role === 'system') msg.className = "p-3 text-xs text-gray-400 italic font-medium";
+
+            msg.innerText = text;
+
+            wrapper.appendChild(avatar);
+            wrapper.appendChild(msg);
+            messagesDiv.appendChild(wrapper);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            return msg;
+        }
+    </script>
+</body>
+
+</html>
