@@ -81,8 +81,9 @@ Click the Trash icon to instantly delete a document.
 
 Click "Clear Conversation" in the sidebar to reset your chat history.
 
-```bash
+
 # 📂 Project Structure
+```bash
 Main Project/
 │── manage.py
 │── requirements.txt
