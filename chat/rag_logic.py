@@ -19,21 +19,6 @@ os.makedirs(upload_directory, exist_ok=True)
 # ---------------------------------------------------------
 # RESTART CLEANUP LOGIC: Clear old vectors and files on boot
 # ---------------------------------------------------------
-if os.path.exists(persist_directory):
-    try:
-        shutil.rmtree(persist_directory)
-        print("Cleared database vector storage on restart.")
-    except Exception as e:
-        print(f"Could not clear DB: {e}")
-
-# Clear uploaded files from the root directory
-for ext in ['*.pdf', '*.docx']:
-    for f in glob.glob(ext):
-        try:
-            os.remove(f)
-            print(f"Cleared old upload: {f}")
-        except Exception:
-            pass
 
 # This model converts text into numbers (embeddings)
 embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
