@@ -42,17 +42,16 @@ vectorstore = get_vectorstore()
 # Custom prompt template to reduce hallucinations
 qa_prompt = PromptTemplate(
     template="""
-    You are a helpful assistant. Use the following context to answer the question.
-    If the answer is not in the context, say you don’t know.
+You are a helpful assistant.
+Answer the question using ONLY the context below.
+If the answer is not in the context, say "I don't know".
 
-    Context:
-    {context}
+Context:
+{context}
 
-    Question:
-    {question}
-
-    Answer:
-    """,
+Question:
+{question}
+""",
     input_variables=["context", "question"]
 )
 
