@@ -22,18 +22,55 @@
             border: 2px dashed #4f46e5;
         }
 
-        /* Custom scrollbar for a cleaner look */
-        ::-webkit-scrollbar {
-            width: 6px;
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+        /* Empty state drop zone */
+        #empty-drop-zone {
+            border: 2px dashed #c7d2fe;
+            transition: all 0.25s ease;
         }
 
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        #empty-drop-zone.active-drag {
+            border-color: #4f46e5;
+            background: rgba(79, 70, 229, 0.06);
+            transform: scale(1.01);
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: #e2e8f0;
-            border-radius: 10px;
+        #empty-drop-zone .upload-icon-ring {
+            transition: all 0.25s ease;
+        }
+
+        #empty-drop-zone.active-drag .upload-icon-ring {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 12px rgba(79, 70, 229, 0.1);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+
+        #empty-drop-zone .float-icon {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.3); }
+            70% { box-shadow: 0 0 0 14px rgba(79, 70, 229, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+        }
+
+        #empty-drop-zone .upload-icon-ring {
+            animation: pulse-ring 2.5s ease-out infinite;
+        }
+
+        .file-type-badge {
+            transition: all 0.2s;
+        }
+        .file-type-badge:hover {
+            transform: translateY(-2px);
         }
     </style>
 </head>
@@ -56,8 +93,7 @@
             </select>
 
             <h3 class="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Your Library</h3>
-            <div id="fileList" class="space-y-2">
-            </div>
+            <div id="fileList" class="space-y-2"></div>
         </div>
 
         <div class="p-4 border-t border-indigo-50">
@@ -69,6 +105,7 @@
     </aside>
 
     <main class="flex-1 flex flex-col relative">
+        <!-- Global drag overlay -->
         <div id="drop-zone"
             class="absolute inset-0 z-10 pointer-events-none transition-all flex items-center justify-center">
             <div id="drop-text"
@@ -87,16 +124,44 @@
 
         <div id="chat-window" class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 chat-window">
             <div id="messages" class="max-w-4xl mx-auto">
-                <div class="flex items-start gap-5 mb-8">
+
+                <!-- Empty state shown when no files exist -->
+                <div id="empty-state" class="flex items-center justify-center h-full min-h-96 pt-8">
                     <div
-                        class="w-10 h-10 rounded-2xl bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white shadow-lg">
-                        <i class="fa-solid fa-robot"></i>
-                    </div>
-                    <div
-                        class="bg-white border border-indigo-50 p-5 rounded-3xl shadow-sm text-gray-700 leading-relaxed">
-                        Hello! I'm ready to help. Upload a PDF to get started.
+                        id="empty-drop-zone"
+                        class="w-full max-w-xl bg-white rounded-3xl p-10 flex flex-col items-center gap-5 cursor-pointer select-none"
+                        onclick="document.getElementById('hiddenFileInput').click()"
+                    >
+                        <!-- Animated icon -->
+                        <div class="upload-icon-ring w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                            <i class="fa-solid fa-cloud-arrow-up text-white text-3xl float-icon"></i>
+                        </div>
+
+                        <!-- Heading -->
+                        <div class="text-center">
+                            <h2 class="text-xl font-bold text-gray-800 mb-1">Drop your document here</h2>
+                            <p class="text-sm text-gray-400 font-medium">or click anywhere in this area to browse files</p>
+                        </div>
+
+                        <!-- File type badges -->
+                        <div class="flex items-center gap-3 mt-1">
+                            <span class="file-type-badge flex items-center gap-2 bg-red-50 text-red-500 text-xs font-bold px-4 py-2 rounded-full border border-red-100">
+                                <i class="fa-solid fa-file-pdf"></i> PDF
+                            </span>
+                            <span class="text-gray-300 font-light text-lg">·</span>
+                            <span class="file-type-badge flex items-center gap-2 bg-blue-50 text-blue-500 text-xs font-bold px-4 py-2 rounded-full border border-blue-100">
+                                <i class="fa-solid fa-file-word"></i> DOCX
+                            </span>
+                        </div>
+
+                        <!-- Divider hint -->
+                        <p class="text-[11px] text-gray-300 font-semibold uppercase tracking-widest mt-1">
+                            Your file never leaves your device
+                        </p>
                     </div>
                 </div>
+
+                <!-- Chat messages will appear here after upload -->
             </div>
         </div>
 
@@ -107,7 +172,6 @@
                 </div>
 
                 <div class="relative bg-white border border-indigo-100 rounded-2xl shadow-xl flex items-end p-2 gap-2">
-
                     <input type="file" id="hiddenFileInput" class="hidden" accept=".pdf,.docx"
                         onchange="handleFileSelect(event)">
 
@@ -129,8 +193,7 @@
 
                 <div class="flex justify-between px-4 mt-2">
                     <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Local Engine v1.0</span>
-                    <span class="text-[10px] text-gray-400 font-medium italic">Shift + Enter for new line • Enter to
-                        send</span>
+                    <span class="text-[10px] text-gray-400 font-medium italic">Shift + Enter for new line • Enter to send</span>
                 </div>
             </div>
         </footer>
@@ -142,8 +205,9 @@
         const userInput = document.getElementById('userInput');
         const messagesDiv = document.getElementById('messages');
         const chatWindow = document.getElementById('chat-window');
+        const emptyState = document.getElementById('empty-state');
+        const emptyDropZone = document.getElementById('empty-drop-zone');
 
-        // Load Library on startup
         window.onload = loadFiles;
 
         // --- Keyboard Controls ---
@@ -154,13 +218,36 @@
             }
         });
 
-        // --- Drag & Drop Logic ---
+        // --- Drag & Drop on empty-state zone ---
+        emptyDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            emptyDropZone.classList.add('active-drag');
+        });
+
+        emptyDropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            emptyDropZone.classList.remove('active-drag');
+        });
+
+        emptyDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            emptyDropZone.classList.remove('active-drag');
+            const file = e.dataTransfer.files[0];
+            if (file) uploadFile(file);
+        });
+
+        // --- Global drag overlay (when files already exist) ---
         ['dragenter', 'dragover'].forEach(n => {
             window.addEventListener(n, (e) => {
                 e.preventDefault();
-                document.getElementById('drop-zone').classList.add('dragover');
-                dropText.style.opacity = '1';
-                dropText.style.transform = 'scale(1)';
+                // Only show overlay if empty state is hidden
+                if (emptyState.style.display === 'none') {
+                    document.getElementById('drop-zone').classList.add('dragover');
+                    dropText.style.opacity = '1';
+                    dropText.style.transform = 'scale(1)';
+                }
             });
         });
 
@@ -174,8 +261,11 @@
         });
 
         window.addEventListener('drop', (e) => {
-            const file = e.dataTransfer.files[0];
-            if (file) uploadFile(file);
+            // Only handle if empty state is hidden (files already uploaded)
+            if (emptyState.style.display === 'none') {
+                const file = e.dataTransfer.files[0];
+                if (file) uploadFile(file);
+            }
         });
 
         // --- File Uploading ---
@@ -183,11 +273,14 @@
             const file = event.target.files[0];
             if (file) {
                 uploadFile(file);
-                event.target.value = ''; // Reset input
+                event.target.value = '';
             }
         }
 
         async function uploadFile(file) {
+            // Hide empty state once a file is uploading
+            hideEmptyState();
+
             const systemMsg = appendMessage('system', `Processing "${file.name}"... Please wait.`);
             const formData = new FormData();
             formData.append('file', file);
@@ -210,6 +303,24 @@
             }
         }
 
+        function hideEmptyState() {
+            emptyState.style.display = 'none';
+            // Show the welcome message once
+            if (!document.getElementById('welcome-msg')) {
+                const welcome = document.createElement('div');
+                welcome.id = 'welcome-msg';
+                welcome.className = 'flex items-start gap-5 mb-8';
+                welcome.innerHTML = `
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white shadow-lg">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="bg-white border border-indigo-50 p-5 rounded-3xl shadow-sm text-gray-700 leading-relaxed">
+                        Hello! I'm ready to help. You can now ask questions about your document.
+                    </div>`;
+                messagesDiv.prepend(welcome);
+            }
+        }
+
         // --- Library Management ---
         async function loadFiles() {
             const res = await fetch('/api/files/');
@@ -219,6 +330,10 @@
 
             list.innerHTML = '';
             select.innerHTML = '<option value="">All Documents</option>';
+
+            if (data.files.length > 0) {
+                hideEmptyState();
+            }
 
             data.files.forEach(f => {
                 select.innerHTML += `<option value="${f}">${f}</option>`;
@@ -246,7 +361,6 @@
             const fileFilter = document.getElementById('fileSelector').value;
             if (!text) return;
 
-            // Clear Input
             userInput.value = '';
             userInput.style.height = 'auto';
 
