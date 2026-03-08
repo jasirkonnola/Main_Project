@@ -10,4 +10,5 @@ urlpatterns = [
     path('ask/', views.ask_api),                   # API for questions
     path('api/files/', views.get_files_api),       # API to show sidebar files
     path('api/delete/', views.delete_file_api),    # API to delete files
+    path('api/insight/', views.insight_api),       # API for word insights
 ]
