@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Register – RAG App</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0f2f5;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    .card {
+      background: #fff;
+      padding: 2.5rem 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      width: 100%;
+      max-width: 420px;
+    }
+
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: .25rem; color: #111; }
+    .subtitle { font-size: .9rem; color: #666; margin-bottom: 1.75rem; }
+
+    /* Style Django's auto-generated form fields */
+    .form-row { margin-bottom: 1.1rem; }
+
+    .form-row label {
+      display: block;
+      font-size: .85rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: .35rem;
+    }
+
+    .form-row input {
+      width: 100%;
+      padding: .65rem .85rem;
+      border: 1px solid #d0d5dd;
+      border-radius: 8px;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .form-row input:focus { border-color: #4f6ef7; }
+
+    .helptext {
+      font-size: .78rem;
+      color: #888;
+      margin-top: .3rem;
+      line-height: 1.4;
+    }
+
+    .errorlist {
+      list-style: none;
+      background: #fff0f0;
+      border: 1px solid #f5c6c6;
+      border-radius: 8px;
+      padding: .6rem .9rem;
+      margin-top: .4rem;
+      font-size: .83rem;
+      color: #c0392b;
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: .75rem;
+      background: #4f6ef7;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .2s;
+      margin-top: .5rem;
+    }
+
+    button[type="submit"]:hover { background: #3a56d4; }
+
+    .footer {
+      text-align: center;
+      margin-top: 1.25rem;
+      font-size: .875rem;
+      color: #555;
+    }
+
+    .footer a { color: #4f6ef7; text-decoration: none; font-weight: 600; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Create account</h1>
+    <p class="subtitle">Your documents stay private to you</p>
+
+    <form method="post">
+      {% csrf_token %}
+
+      {% for field in form %}
+        <div class="form-row">
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.help_text %}
+            <p class="helptext">{{ field.help_text }}</p>
+          {% endif %}
+          {% if field.errors %}
+            <ul class="errorlist">
+              {% for error in field.errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <button type="submit">Create Account</button>
+    </form>
+
+    <p class="footer">
+      Already have an account? <a href="{% url 'login' %}">Sign In</a>
+    </p>
+  </div>
+</body>
+</html>

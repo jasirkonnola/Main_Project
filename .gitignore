@@ -1,3 +1,26 @@
+# Python virtual environment
 venv/
-db_storage/
+
+# Django database
+db.sqlite3
+
+# Uploaded files
 uploads/
+
+# Vector DB / storage
+db_storage/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

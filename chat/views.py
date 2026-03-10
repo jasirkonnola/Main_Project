@@ -1,7 +1,10 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.core.files.storage import default_storage
 from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login
 from langchain_community.llms import Ollama
 
 from .rag_logic import ingest_file, ask_question, list_documents, delete_document
@@ -11,14 +14,51 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# -----------------------------------------------
+# Auth views
+# -----------------------------------------------
+
+def register_view(request):
+    """User registration page."""
+    if request.user.is_authenticated:
+        return redirect('chat')
+
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('chat')
+    else:
+        form = UserCreationForm()
+
+    return render(request, 'auth/register.html', {'form': form})
+
+
+# -----------------------------------------------
+# Page views
+# -----------------------------------------------
+
 def home(request):
     return render(request, 'home.html')
 
 
+@login_required
 def chat_page(request):
     return render(request, 'index.html')
 
 
+@login_required
+def profile_view(request):
+    """User profile page."""
+    return render(request, 'profile.html')
+
+
+# -----------------------------------------------
+# API views (login required)
+# -----------------------------------------------
+
+@login_required
 @require_http_methods(["POST"])
 def upload_api(request):
     file = request.FILES.get('file')
@@ -29,13 +69,14 @@ def upload_api(request):
     try:
         file_name = default_storage.save(file.name, file)
         file_path = default_storage.path(file_name)
-        ingest_file(file_path)
+        ingest_file(file_path, user_id=request.user.id)
         return JsonResponse({"status": "File processed!", "filename": file.name})
     except Exception as e:
         logger.exception("Failed to ingest file: %s", file.name)
         return JsonResponse({"error": "File processing failed.", "detail": str(e)}, status=500)
 
 
+@login_required
 @require_http_methods(["GET"])
 def ask_api(request):
     user_query = request.GET.get('question', '').strip()
@@ -45,24 +86,26 @@ def ask_api(request):
         return JsonResponse({"error": "Missing required parameter: 'question'."}, status=400)
 
     try:
-        answer = ask_question(user_query, target_file)
+        answer = ask_question(user_query, user_id=request.user.id, target_file=target_file)
         return JsonResponse({"answer": answer})
     except Exception as e:
         logger.exception("Failed to answer question: %s", user_query)
         return JsonResponse({"error": "Could not process question.", "detail": str(e)}, status=500)
 
 
+@login_required
 @require_http_methods(["GET"])
 def get_files_api(request):
     try:
-        files = list_documents()
+        files = list_documents(user_id=request.user.id)
         return JsonResponse({"files": files})
     except Exception as e:
         logger.exception("Failed to list documents.")
         return JsonResponse({"error": "Could not retrieve files.", "detail": str(e)}, status=500)
 
 
-@require_http_methods(["DELETE"])
+@login_required
+@require_http_methods(["GET", "DELETE"])
 def delete_file_api(request):
     filename = request.GET.get('filename', '').strip()
 
@@ -70,10 +113,16 @@ def delete_file_api(request):
         return JsonResponse({"error": "Missing required parameter: 'filename'."}, status=400)
 
     try:
-        success = delete_document(filename)
+        success = delete_document(filename, user_id=request.user.id)
+
         if not success:
-            return JsonResponse({"error": f"File '{filename}' not found or could not be deleted."}, status=404)
+            return JsonResponse(
+                {"error": f"File '{filename}' not found or could not be deleted."},
+                status=404,
+            )
+
         return JsonResponse({"success": True, "deleted": filename})
+
     except Exception as e:
         logger.exception("Failed to delete document: %s", filename)
         return JsonResponse({"error": "Deletion failed.", "detail": str(e)}, status=500)
@@ -81,6 +130,8 @@ def delete_file_api(request):
 
 VALID_TABS = {'define', 'insight'}
 
+
+@login_required
 @require_http_methods(["GET"])
 def insight_api(request):
     word = request.GET.get('word', '').strip()
@@ -90,7 +141,10 @@ def insight_api(request):
         return JsonResponse({"error": "Missing required parameter: 'word'."}, status=400)
 
     if tab not in VALID_TABS:
-        return JsonResponse({"error": f"Invalid tab. Must be one of: {', '.join(VALID_TABS)}."}, status=400)
+        return JsonResponse(
+            {"error": f"Invalid tab. Must be one of: {', '.join(VALID_TABS)}."},
+            status=400,
+        )
 
     if tab == 'define':
         prompt = (
