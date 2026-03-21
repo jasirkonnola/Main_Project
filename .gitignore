@@ -3,7 +3,6 @@ venv/
 
 # Django database
 db.sqlite3
-
 # Uploaded files
 uploads/
 
