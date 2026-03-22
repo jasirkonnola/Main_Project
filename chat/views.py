@@ -8,6 +8,7 @@ from django.contrib.auth import login
 from langchain_community.llms import Ollama
 
 from .rag_logic import ingest_file, ask_question, list_documents, delete_document
+from .models import ChatMessage
 
 import logging
 
@@ -87,6 +88,8 @@ def ask_api(request):
 
     try:
         answer = ask_question(user_query, user_id=request.user.id, target_file=target_file)
+        if answer:
+            ChatMessage.objects.create(user=request.user, query=user_query, answer=answer)
         return JsonResponse({"answer": answer})
     except Exception as e:
         logger.exception("Failed to answer question: %s", user_query)
@@ -126,6 +129,18 @@ def delete_file_api(request):
     except Exception as e:
         logger.exception("Failed to delete document: %s", filename)
         return JsonResponse({"error": "Deletion failed.", "detail": str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_chat_history_api(request):
+    try:
+        messages = ChatMessage.objects.filter(user=request.user).order_by('created_at')
+        history = [{"query": m.query, "answer": m.answer} for m in messages]
+        return JsonResponse({"history": history})
+    except Exception as e:
+        logger.exception("Failed to retrieve chat history.")
+        return JsonResponse({"error": "Could not retrieve history.", "detail": str(e)}, status=500)
 
 
 VALID_TABS = {'define', 'insight'}

@@ -224,7 +224,27 @@
     let currentSelectedText = '';
     const insightCache = {};
 
-    window.onload = loadFiles;
+    window.onload = async () => {
+        await loadFiles();
+        await loadHistory();
+    };
+
+    async function loadHistory() {
+        try {
+            const res = await fetch('/api/history/');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.history && data.history.length > 0) {
+                hideEmptyState();
+                data.history.forEach(msg => {
+                    appendMessage('user', msg.query);
+                    appendMessage('ai', msg.answer);
+                });
+            }
+        } catch (err) {
+            console.error("Failed to load chat history", err);
+        }
+    }
 
     // Keyboard
     userInput.addEventListener('keydown', (e) => {
