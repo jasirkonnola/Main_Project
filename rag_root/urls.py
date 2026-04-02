@@ -24,7 +24,9 @@ urlpatterns = [
     path('upload/',      views.upload_api),
     path('ask/',         views.ask_api),
     path('api/files/',   views.get_files_api),
+    path('api/sessions/', views.get_sessions_api),
     path('api/history/', views.get_chat_history_api),
+    path('api/history/delete/', views.delete_chat_history_api),
     path('api/delete/',  views.delete_file_api),
     path('api/insight/', views.insight_api),
 ]

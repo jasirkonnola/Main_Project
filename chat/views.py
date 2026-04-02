@@ -8,7 +8,7 @@ from django.contrib.auth import login
 from langchain_community.llms import Ollama
 
 from .rag_logic import ingest_file, ask_question, list_documents, delete_document
-from .models import ChatMessage
+from .models import ChatMessage, ChatSession
 
 import logging
 
@@ -67,10 +67,17 @@ def upload_api(request):
     if not file:
         return JsonResponse({"error": "No file provided."}, status=400)
 
+    session_id = request.POST.get('session_id')
+    if not session_id:
+        return JsonResponse({"error": "No session_id provided."}, status=400)
+
+    # ensure session exists
+    ChatSession.objects.get_or_create(id=session_id, user=request.user)
+
     try:
         file_name = default_storage.save(file.name, file)
         file_path = default_storage.path(file_name)
-        ingest_file(file_path, user_id=request.user.id)
+        ingest_file(file_path, user_id=request.user.id, session_id=session_id)
         return JsonResponse({"status": "File processed!", "filename": file.name})
     except Exception as e:
         logger.exception("Failed to ingest file: %s", file.name)
@@ -86,10 +93,16 @@ def ask_api(request):
     if not user_query:
         return JsonResponse({"error": "Missing required parameter: 'question'."}, status=400)
 
+    session_id = request.GET.get('session_id')
+    if not session_id:
+        return JsonResponse({"error": "Missing session_id."}, status=400)
+
+    session, _ = ChatSession.objects.get_or_create(id=session_id, user=request.user)
+
     try:
-        answer = ask_question(user_query, user_id=request.user.id, target_file=target_file)
+        answer = ask_question(user_query, user_id=request.user.id, target_file=target_file, session_id=session_id)
         if answer:
-            ChatMessage.objects.create(user=request.user, query=user_query, answer=answer)
+            ChatMessage.objects.create(session=session, user=request.user, query=user_query, answer=answer)
         return JsonResponse({"answer": answer})
     except Exception as e:
         logger.exception("Failed to answer question: %s", user_query)
@@ -99,8 +112,9 @@ def ask_api(request):
 @login_required
 @require_http_methods(["GET"])
 def get_files_api(request):
+    session_id = request.GET.get('session_id')
     try:
-        files = list_documents(user_id=request.user.id)
+        files = list_documents(user_id=request.user.id, session_id=session_id)
         return JsonResponse({"files": files})
     except Exception as e:
         logger.exception("Failed to list documents.")
@@ -111,12 +125,13 @@ def get_files_api(request):
 @require_http_methods(["GET", "DELETE"])
 def delete_file_api(request):
     filename = request.GET.get('filename', '').strip()
+    session_id = request.GET.get('session_id')
 
     if not filename:
         return JsonResponse({"error": "Missing required parameter: 'filename'."}, status=400)
 
     try:
-        success = delete_document(filename, user_id=request.user.id)
+        success = delete_document(filename, user_id=request.user.id, session_id=session_id)
 
         if not success:
             return JsonResponse(
@@ -134,13 +149,42 @@ def delete_file_api(request):
 @login_required
 @require_http_methods(["GET"])
 def get_chat_history_api(request):
+    session_id = request.GET.get('session_id')
+    if not session_id:
+        return JsonResponse({"history": []})
     try:
-        messages = ChatMessage.objects.filter(user=request.user).order_by('created_at')
+        messages = ChatMessage.objects.filter(user=request.user, session_id=session_id).order_by('created_at')
         history = [{"query": m.query, "answer": m.answer} for m in messages]
         return JsonResponse({"history": history})
     except Exception as e:
         logger.exception("Failed to retrieve chat history.")
         return JsonResponse({"error": "Could not retrieve history.", "detail": str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def get_sessions_api(request):
+    try:
+        sessions = ChatSession.objects.filter(user=request.user).order_by('-created_at')
+        session_list = [{"id": str(s.id), "title": s.title} for s in sessions]
+        return JsonResponse({"sessions": session_list})
+    except Exception as e:
+        logger.exception("Failed to retrieve sessions.")
+        return JsonResponse({"error": "Failed to retrieve sessions.", "detail": str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST", "DELETE"])
+def delete_chat_history_api(request):
+    session_id = request.GET.get('session_id')
+    if not session_id:
+        return JsonResponse({"error": "Missing session_id"}, status=400)
+    try:
+        ChatSession.objects.filter(id=session_id, user=request.user).delete()
+        return JsonResponse({"success": True})
+    except Exception as e:
+        logger.exception("Failed to delete chat history.")
+        return JsonResponse({"error": "Could not delete history.", "detail": str(e)}, status=500)
 
 
 VALID_TABS = {'define', 'insight'}

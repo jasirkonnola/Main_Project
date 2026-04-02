@@ -62,17 +62,29 @@
 
 <!-- LEFT SIDEBAR -->
 <aside class="w-80 bg-white border-r border-indigo-50 flex flex-col shadow-xl z-20 flex-shrink-0">
-    <div class="p-6 border-b border-indigo-50 flex items-center gap-3">
-        <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg">
-            <i class="fa-solid fa-shapes text-sm"></i>
+    <div class="p-6 border-b border-indigo-50 flex flex-col gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg">
+                <i class="fa-solid fa-shapes text-sm"></i>
+            </div>
+            <span class="font-bold text-xl tracking-tight">Docu<span class="text-indigo-600">Chat</span></span>
         </div>
-        <span class="font-bold text-xl tracking-tight">Docu<span class="text-indigo-600">Chat</span></span>
+        
+        <div class="flex gap-2 w-full mt-2">
+            <button onclick="startNewChat()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-3 rounded-xl transition shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-plus"></i> New Chat
+            </button>
+        </div>
     </div>
     <div class="p-4 flex-1 overflow-y-auto">
+        <h3 class="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Previous Chats</h3>
+        <div id="sessionList" class="space-y-2 mb-6"></div>
+
         <h3 class="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Select Context</h3>
         <select id="fileSelector" class="w-full bg-indigo-50 border-none rounded-xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500 mb-6 cursor-pointer">
             <option value="">All Documents</option>
         </select>
+        
         <h3 class="text-[11px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Your Library</h3>
         <div id="fileList" class="space-y-2"></div>
     </div>
@@ -224,14 +236,88 @@
     let currentSelectedText = '';
     const insightCache = {};
 
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    let currentSessionId = generateUUID();
+
     window.onload = async () => {
+        await loadSessions();
+    };
+
+    async function loadSessions() {
+        try {
+            const res = await fetch('/api/sessions/');
+            const data = await res.json();
+            const list = document.getElementById('sessionList');
+            list.innerHTML = '';
+            if (data.sessions && data.sessions.length > 0) {
+                // load the first one by default if it's the initial page load
+                // but wait, we should only do it on initial load
+                // The prompt asks to load previous history, so we initialize with the latest session
+                if (currentSessionId === "initial" || document.getElementById('sessionList').children.length === 0) {
+                    currentSessionId = data.sessions[0].id;
+                }
+                
+                data.sessions.forEach(s => {
+                    list.innerHTML += `
+                        <div onclick="loadSession('${s.id}')" class="cursor-pointer flex justify-between items-center p-3 bg-indigo-50/50 rounded-xl group transition hover:bg-indigo-50">
+                            <span class="text-xs font-semibold text-gray-600 truncate w-48">
+                                <i class="fa-solid fa-message mr-2 text-indigo-400"></i>${s.title}
+                            </span>
+                            <button onclick="deleteSession('${s.id}', event)" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition" title="Delete Chat">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>`;
+                });
+            } else {
+                currentSessionId = generateUUID();
+            }
+            // After determining currentSessionId
+            await loadSession(currentSessionId, true);
+        } catch (err) { console.error(err); }
+    }
+
+    async function loadSession(sessionId, skipLoadSessions=false) {
+        currentSessionId = sessionId;
+        messagesDiv.innerHTML = '';
+        emptyState.style.display = 'flex';
+        messagesDiv.appendChild(emptyState);
+        document.getElementById('select-hint').classList.add('hidden');
+        
         await loadFiles();
         await loadHistory();
-    };
+        
+        if (!skipLoadSessions) {
+            // refresh session list styling or just re-fetch
+            const res = await fetch('/api/sessions/');
+            const data = await res.json();
+            const list = document.getElementById('sessionList');
+            list.innerHTML = '';
+            if (data.sessions) {
+                data.sessions.forEach(s => {
+                    const isActive = s.id === currentSessionId;
+                    list.innerHTML += `
+                        <div onclick="loadSession('${s.id}')" class="cursor-pointer flex justify-between items-center p-3 ${isActive ? 'bg-indigo-100 border border-indigo-200' : 'bg-indigo-50/50'} rounded-xl group transition hover:bg-indigo-50">
+                            <span class="text-xs font-semibold text-gray-600 truncate w-48">
+                                <i class="fa-solid fa-message mr-2 text-indigo-400"></i>${s.title}
+                            </span>
+                            <button onclick="deleteSession('${s.id}', event)" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition" title="Delete Chat">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>`;
+                });
+            }
+        }
+    }
 
     async function loadHistory() {
         try {
-            const res = await fetch('/api/history/');
+            const res = await fetch(`/api/history/?session_id=${currentSessionId}`);
             if (!res.ok) return;
             const data = await res.json();
             if (data.history && data.history.length > 0) {
@@ -416,6 +502,7 @@
         const systemMsg = appendMessage('system', `Processing "${file.name}"... Please wait.`);
         const formData  = new FormData();
         formData.append('file', file);
+        formData.append('session_id', currentSessionId);
 
         try {
             const response = await fetch('/upload/', {
@@ -459,7 +546,7 @@
     // LIBRARY
     // ─────────────────────────────────────────
     async function loadFiles() {
-        const res  = await fetch('/api/files/');
+        const res  = await fetch(`/api/files/?session_id=${currentSessionId}`);
         const data = await res.json();
         const list = document.getElementById('fileList');
         const select = document.getElementById('fileSelector');
@@ -484,13 +571,43 @@
 
     async function deleteFile(name) {
         if (!confirm(`Remove ${name} from memory?`)) return;
-        await fetch(`/api/delete/?filename=${name}`);
+        await fetch(`/api/delete/?filename=${name}&session_id=${currentSessionId}`);
         loadFiles();
     }
 
     // ─────────────────────────────────────────
     // CHAT
     // ─────────────────────────────────────────
+    async function startNewChat() {
+        currentSessionId = generateUUID();
+        await loadSession(currentSessionId);
+    }
+
+    async function deleteSession(sessionId, event) {
+        event.stopPropagation(); // prevent loadSession from firing
+        if (!confirm("Are you sure you want to delete this chat?")) return;
+        
+        try {
+            const res = await fetch(`/api/history/delete/?session_id=${sessionId}`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            if (res.ok) {
+                if (currentSessionId === sessionId) {
+                    startNewChat();
+                } else {
+                    // just reload sessions if we deleted a different one
+                    await loadSessions();
+                }
+            } else {
+                alert("Failed to delete chat history.");
+            }
+        } catch (err) {
+            console.error("Failed to delete chat", err);
+            alert("Error trying to delete chat history.");
+        }
+    }
+
     async function handleSend() {
         const text = userInput.value.trim();
         const fileFilter = document.getElementById('fileSelector').value;
@@ -503,7 +620,7 @@
         const aiMsg = appendMessage('ai', null, true);
 
         try {
-            const res  = await fetch(`/ask/?question=${encodeURIComponent(text)}&file=${fileFilter}`);
+            const res  = await fetch(`/ask/?question=${encodeURIComponent(text)}&file=${fileFilter}&session_id=${currentSessionId}`);
             const data = await res.json();
             aiMsg.innerHTML = escHtml(data.answer);
         } catch (err) {

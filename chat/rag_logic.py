@@ -35,22 +35,30 @@ def get_vectorstore(user_id: int):
 
 # Custom prompt — reduces hallucinations
 qa_prompt = PromptTemplate(
-    template="""
-You are a helpful assistant.
-Answer the question using ONLY the context below.
-If the answer is not in the context, say "I don't know".
+    template="""You are an intelligent academic assistant for college notes. Your role is to help students understand their course material accurately and clearly.
 
-Context:
+## Instructions
+- Answer the question using ONLY the information provided in the context below.
+- Be concise but thorough. If the question requires a detailed explanation, provide one.
+- If the context contains partial information, share what is available and note what is incomplete.
+- If the answer is genuinely not in the context, respond: "I don't have enough information in the provided notes to answer this question."
+- Never fabricate or assume information not present in the context.
+- Use clear formatting (bullet points, numbered lists, or short paragraphs) based on what best suits the answer.
+- If the question is a definition, start with a direct one-line definition before elaborating.
+- If the question involves steps or a process, present them in order.
+
+## Context (from uploaded notes):
 {context}
 
-Question:
+## Question:
 {question}
-""",
+
+## Answer:""",
     input_variables=["context", "question"],
 )
 
 
-def ingest_file(file_path: str, user_id: int) -> str:
+def ingest_file(file_path: str, user_id: int, session_id: str = None) -> str:
     """Ingest a PDF or DOCX file into the user's vector store."""
     filename = os.path.basename(file_path)
 
@@ -71,17 +79,30 @@ def ingest_file(file_path: str, user_id: int) -> str:
     splits = splitter.split_documents(docs)
 
     vstore = get_vectorstore(user_id)
+    
+    if session_id:
+        for split in splits:
+            split.metadata['session_id'] = session_id
+            
     vstore.add_documents(splits)
     return "Success"
 
 
-def ask_question(query: str, user_id: int, target_file: str = None) -> str:
+def ask_question(query: str, user_id: int, target_file: str = None, session_id: str = None) -> str:
     """Answer a question using the user's private vector store."""
     vectorstore = get_vectorstore(user_id)
 
+    search_filter = {}
+    if target_file and session_id:
+        search_filter = {"$and": [{"source": {"$contains": target_file}}, {"session_id": session_id}]}
+    elif target_file:
+        search_filter = {"source": {"$contains": target_file}}
+    elif session_id:
+        search_filter = {"session_id": session_id}
+
     search_kwargs = {"k": 5}
-    if target_file:
-        search_kwargs["filter"] = {"source": {"$contains": target_file}}
+    if search_filter:
+        search_kwargs["filter"] = search_filter
 
     llm = Ollama(model="llama3")
     chain = RetrievalQA.from_chain_type(
@@ -94,25 +115,31 @@ def ask_question(query: str, user_id: int, target_file: str = None) -> str:
     return response['result']
 
 
-def list_documents(user_id: int) -> list:
-    """List all documents ingested by this user."""
+def list_documents(user_id: int, session_id: str = None) -> list:
+    """List all documents ingested by this user for a session."""
     vstore = get_vectorstore(user_id)
     data = vstore.get()
+    
+    docs = []
     if data['metadatas']:
-        return list(set([os.path.basename(m['source']) for m in data['metadatas']]))
-    return []
+        for m in data['metadatas']:
+            if session_id and m.get('session_id') != session_id:
+                continue
+            docs.append(os.path.basename(m['source']))
+    return list(set(docs))
 
 
-def delete_document(filename: str, user_id: int) -> bool:
+def delete_document(filename: str, user_id: int, session_id: str = None) -> bool:
     """Delete a document from the user's vector store."""
     vstore = get_vectorstore(user_id)
     data = vstore.get()
 
-    ids_to_delete = [
-        data['ids'][i]
-        for i, m in enumerate(data['metadatas'])
-        if filename in m['source']
-    ]
+    ids_to_delete = []
+    for i, m in enumerate(data['metadatas']):
+        if filename in m.get('source', ''):
+            if session_id and m.get('session_id') != session_id:
+                continue
+            ids_to_delete.append(data['ids'][i])
 
     if ids_to_delete:
         vstore.delete(ids=ids_to_delete)
